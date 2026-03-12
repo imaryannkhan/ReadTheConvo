@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReadTheConvo — AI DM Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --accent: #c8f542;
+    --accent2: #f5a742;
+    --accent3: #42c8f5;
+    --text: #f0f0f0;
+    --muted: #666;
+    --danger: #f54242;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    padding: 32px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: -0.5px; }
+  .logo span { color: var(--accent); }
+
+  .badge {
+    background: var(--accent); color: #000;
+    font-size: 10px; font-weight: 500;
+    padding: 4px 10px; border-radius: 100px;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+
+  main { max-width: 900px; margin: 0 auto; padding: 60px 40px; }
+
+  .hero { margin-bottom: 56px; animation: fadeUp 0.6s ease both; }
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(36px, 6vw, 64px);
+    font-weight: 800; line-height: 1.05;
+    letter-spacing: -2px; margin-bottom: 16px;
+  }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { color: var(--muted); font-size: 14px; line-height: 1.7; max-width: 500px; }
+
+  .input-section { animation: fadeUp 0.6s 0.1s ease both; }
+
+  .input-label {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .input-label::before {
+    content: ''; display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--accent); border-radius: 50%;
+  }
+
+  textarea {
+    width: 100%; min-height: 220px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 13px; line-height: 1.7;
+    resize: vertical; outline: none; transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,245,66,0.08); }
+  textarea::placeholder { color: #333; }
+
+  .tab-row {
+    display: flex; gap: 4px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 4px;
+    margin-bottom: 20px; width: fit-content;
+  }
+  .tab-btn {
+    padding: 8px 20px; border: none; background: transparent;
+    color: var(--muted); font-family: 'DM Mono', monospace;
+    font-size: 12px; cursor: pointer; border-radius: 7px;
+    transition: all 0.2s; letter-spacing: 0.5px;
+  }
+  .tab-btn.active { background: var(--accent); color: #000; font-weight: 500; }
+
+  .drop-zone {
+    display: none; width: 100%; min-height: 220px;
+    border: 2px dashed var(--border); border-radius: 12px;
+    background: var(--surface);
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 12px;
+    cursor: pointer; transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .drop-zone.active-tab { display: flex; }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); background: rgba(200,245,66,0.04); }
+  .drop-zone-icon { font-size: 32px; opacity: 0.4; }
+  .drop-zone-text { color: var(--muted); font-size: 13px; text-align: center; line-height: 1.6; }
+  .drop-zone-text strong { color: var(--accent); font-weight: 500; }
+  .drop-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+  .img-preview { display: none; position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  .img-preview.visible { display: block; }
+  .img-preview img { width: 100%; max-height: 400px; object-fit: contain; background: var(--surface); display: block; }
+  .img-preview-remove {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.7); border: 1px solid var(--border);
+    color: var(--text); width: 28px; height: 28px; border-radius: 50%;
+    cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .img-preview-remove:hover { background: var(--danger); }
+  .paste-hint { font-size: 11px; color: #333; text-align: center; margin-top: 10px; letter-spacing: 0.5px; }
+
+  .analyze-btn {
+    margin-top: 16px; width: 100%; padding: 18px;
+    background: var(--accent); color: #000; border: none;
+    border-radius: 10px; font-family: 'Syne', sans-serif;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.5px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .analyze-btn:hover { background: #d8ff55; transform: translateY(-1px); box-shadow: 0 8px 32px rgba(200,245,66,0.25); }
+  .analyze-btn:active { transform: translateY(0); }
+  .analyze-btn:disabled { background: #222; color: #444; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .loading { display: none; align-items: center; gap: 12px; padding: 24px 0; color: var(--muted); font-size: 13px; }
+  .loading.active { display: flex; }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+  .error-msg {
+    background: rgba(245,66,66,0.08); border: 1px solid rgba(245,66,66,0.3);
+    border-radius: 10px; padding: 16px 20px; color: var(--danger);
+    font-size: 13px; margin-top: 16px; display: none;
+  }
+  .error-msg.visible { display: block; }
+
+  #results { margin-top: 48px; display: none; animation: fadeUp 0.5s ease both; }
+  #results.visible { display: block; }
+
+  .results-header {
+    font-family: 'Syne', sans-serif; font-size: 11px;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .results-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .temp-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; margin-bottom: 16px;
+    position: relative; overflow: hidden;
+  }
+  .temp-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 3px; background: var(--temp-color, var(--accent));
+  }
+  .temp-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .temp-value { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; margin-bottom: 12px; }
+  .temp-bar-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .temp-bar-fill { height: 100%; border-radius: 3px; transition: width 1s cubic-bezier(0.16,1,0.3,1); width: 0%; }
+
+  .qual-section { margin-bottom: 16px; }
+  .qual-section-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .qual-row {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px;
+    display: flex; gap: 14px; align-items: flex-start; margin-bottom: 8px;
+  }
+  .qual-key { font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); min-width: 120px; padding-top: 2px; flex-shrink: 0; }
+  .qual-val { font-size: 13px; color: var(--text); line-height: 1.5; flex: 1; }
+  .qual-val.empty { color: var(--muted); font-style: italic; }
+  .qual-val.highlight { color: var(--accent); }
+
+  .cards-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px; margin-bottom: 16px;
+  }
+  @media (max-width: 600px) { .cards-grid { grid-template-columns: 1fr; } }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .card-label { font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .card-value { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; line-height: 1.4; }
+  .card-value.warn { color: var(--accent2); }
+  .card-value.danger { color: var(--danger); }
+
+  .next-msg-card {
+    background: var(--surface); border: 1px solid var(--accent);
+    border-radius: 12px; padding: 28px; margin-bottom: 16px; position: relative;
+  }
+  .next-msg-card::before {
+    content: '→ SEND THIS'; position: absolute; top: -1px; right: 20px;
+    background: var(--accent); color: #000;
+    font-size: 9px; font-weight: 600; letter-spacing: 2px;
+    padding: 4px 10px; border-radius: 0 0 6px 6px;
+  }
+  .next-msg-text { font-size: 14px; line-height: 1.75; color: var(--text); white-space: pre-wrap; }
+  .copy-btn {
+    margin-top: 16px; padding: 10px 20px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 8px;
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .ghost-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+  .ghost-reason { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.6; }
+
+  .power-card {
+    background: linear-gradient(135deg, rgba(200,245,66,0.06), rgba(66,200,245,0.04));
+    border: 1px solid rgba(200,245,66,0.25);
+    border-radius: 12px; padding: 28px; margin-bottom: 32px; position: relative;
+  }
+  .power-card::before {
+    content: '⚡ POWER INSIGHT'; position: absolute; top: -1px; left: 20px;
+    background: linear-gradient(90deg, #c8f542, #42c8f5); color: #000;
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    padding: 4px 12px; border-radius: 0 0 6px 6px;
+  }
+  .power-text { font-size: 14px; line-height: 1.8; color: var(--text); margin-top: 8px; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer { text-align: center; padding: 40px; color: #2a2a2a; font-size: 11px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Read<span>The</span>Convo</div>
+  <div class="badge">Beta</div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>Know exactly<br>what your lead<br><em>actually means.</em></h1>
+    <p>Paste any DM conversation. Get the full qualification read, hidden objections, and the exact message to send next.</p>
+  </div>
+
+  <div class="input-section">
+    <div class="tab-row">
+      <button class="tab-btn active" id="tab-text" onclick="switchTab('text')">✏️ Paste Text</button>
+      <button class="tab-btn" id="tab-image" onclick="switchTab('image')">📸 Screenshot</button>
+    </div>
+
+    <div id="text-panel">
+      <div class="input-label">Paste DM conversation</div>
+      <textarea id="dm-input" placeholder="You: Hey, what's your main goal right now?
+
+Lead: honestly I want to lose weight, been trying for a while
+
+You: How long have you been at it?
+
+Lead: like 6 months, not much progress though
+
+You: What's been the main thing getting in the way?
+
+Lead: just consistency and not knowing what to eat"></textarea>
+    </div>
+
+    <div id="image-panel" style="display:none">
+      <div class="input-label">Upload or paste screenshot</div>
+      <div class="drop-zone active-tab" id="drop-zone">
+        <div class="drop-zone-icon">📷</div>
+        <div class="drop-zone-text">
+          <strong>Click to upload</strong> or drag & drop<br>
+          or press <strong>Ctrl+V / ⌘V</strong> to paste a screenshot
+        </div>
+        <input type="file" accept="image/*" id="file-input" onchange="handleFile(this.files[0])">
+      </div>
+      <div class="img-preview" id="img-preview">
+        <img id="preview-img" src="" alt="DM Screenshot">
+        <button class="img-preview-remove" onclick="clearImage()" title="Remove">✕</button>
+      </div>
+      <div class="paste-hint" id="paste-hint">Screenshot will be read by AI vision</div>
+    </div>
+
+    <button class="analyze-btn" id="analyze-btn" onclick="analyzeDM()">
+      Analyze This Conversation →
+    </button>
+
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      Reading between the lines...
+    </div>
+
+    <div class="error-msg" id="error-msg"></div>
+  </div>
+
+  <div id="results">
+    <div class="results-header">Analysis</div>
+
+    <div class="temp-card" id="temp-card">
+      <div class="temp-label">Lead Temperature</div>
+      <div class="temp-value" id="temp-value">—</div>
+      <div class="temp-bar-track">
+        <div class="temp-bar-fill" id="temp-bar"></div>
+      </div>
+    </div>
+
+    <div class="qual-section">
+      <div class="qual-section-label">📋 Lead Qualification</div>
+      <div class="qual-row">
+        <div class="qual-key">🎯 Goal</div>
+        <div class="qual-val" id="q-goal">—</div>
+      </div>
+      <div class="qual-row">
+        <div class="qual-key">🚧 Struggle</div>
+        <div class="qual-val" id="q-struggle">—</div>
+      </div>
+      <div class="qual-row">
+        <div class="qual-key">⏳ How Long</div>
+        <div class="qual-val" id="q-how-long">—</div>
+      </div>
+      <div class="qual-row">
+        <div class="qual-key">📍 Location & Work</div>
+        <div class="qual-val" id="q-location">—</div>
+      </div>
+      <div class="qual-row">
+        <div class="qual-key">❤️ Why Important</div>
+        <div class="qual-val" id="q-why">—</div>
+      </div>
+    </div>
+
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-label">Hidden Objection</div>
+        <div class="card-value warn" id="hidden-objection">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Ghost Risk</div>
+        <div class="card-value danger" id="ghost-risk">—</div>
+      </div>
+    </div>
+
+    <div class="next-msg-card">
+      <div class="card-label" style="margin-bottom:14px">Recommended Next Message</div>
+      <div class="next-msg-text" id="next-message">—</div>
+      <button class="copy-btn" onclick="copyMessage()">Copy message</button>
+    </div>
+
+    <div class="ghost-card">
+      <div class="card-label">Why Ghost Risk is This Level</div>
+      <div class="ghost-reason" id="ghost-risk-reason">—</div>
+    </div>
+
+    <div class="power-card">
+      <div class="power-text" id="power-insight">—</div>
+    </div>
+  </div>
+</main>
+
+<footer>ReadTheConvo · AI-powered DM intelligence</footer>
+
+<script>
+let currentTab = 'text';
+let uploadedImageBase64 = null;
+let uploadedImageType = 'image/jpeg';
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-text').classList.toggle('active', tab === 'text');
+  document.getElementById('tab-image').classList.toggle('active', tab === 'image');
+  document.getElementById('text-panel').style.display = tab === 'text' ? 'block' : 'none';
+  document.getElementById('image-panel').style.display = tab === 'image' ? 'block' : 'none';
+}
+
+function handleFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  uploadedImageType = file.type;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    uploadedImageBase64 = e.target.result.split(',')[1];
+    document.getElementById('preview-img').src = e.target.result;
+    document.getElementById('img-preview').classList.add('visible');
+    document.getElementById('drop-zone').style.display = 'none';
+    document.getElementById('paste-hint').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearImage() {
+  uploadedImageBase64 = null;
+  document.getElementById('img-preview').classList.remove('visible');
+  document.getElementById('drop-zone').style.display = 'flex';
+  document.getElementById('paste-hint').style.display = 'block';
+  document.getElementById('file-input').value = '';
+}
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+
+document.addEventListener('paste', (e) => {
+  if (currentTab !== 'image') return;
+  const items = e.clipboardData.items;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) { handleFile(item.getAsFile()); break; }
+  }
+});
+
+async function analyzeDM() {
+  const btn = document.getElementById('analyze-btn');
+  const loading = document.getElementById('loading');
+  const results = document.getElementById('results');
+  const errorMsg = document.getElementById('error-msg');
+  const textInput = document.getElementById('dm-input').value.trim();
+
+  if (currentTab === 'text' && !textInput) return;
+  if (currentTab === 'image' && !uploadedImageBase64) {
+    errorMsg.textContent = 'Please upload or paste a screenshot first.';
+    errorMsg.classList.add('visible');
+    return;
+  }
+
+  btn.disabled = true;
+  loading.classList.add('active');
+  results.classList.remove('visible');
+  errorMsg.classList.remove('visible');
+
+  const systemPrompt = `You are the world's sharpest DM sales psychologist and lead qualifier for high-ticket online fitness coaching. You have analyzed thousands of Instagram DM conversations. You read what is said AND what is not said.
+
+CONTEXT: You analyze Instagram DM conversations for a fitness coaching setter. Your job has two parts: (1) Extract the 5 core qualification data points from the conversation, and (2) Read the lead's psychology to guide the setter on what to do next. The setter's style is short, direct, one question at a time, casual, human — never salesy.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 1 — QUALIFICATION DATA
+Extract these 5 things from what the lead has said. If something has NOT been mentioned yet, write "Not mentioned yet" — never guess or fabricate.
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+goal: What does this lead specifically want to achieve with their fitness? Their exact goal in their own words. Do not reframe or clean it up. If not mentioned: "Not mentioned yet".
+
+struggle: What has been getting in the way of their progress? What specific obstacle did they describe — consistency, travel, not knowing what to do, plateau, life circumstances? Be specific. If not mentioned: "Not mentioned yet".
+
+how_long: How long have they been struggling with this or trying to fix it? Exact answer from the conversation. If not mentioned: "Not mentioned yet".
+
+location_and_work: Where do they live, what do they do for work, what does their lifestyle look like? Pull every detail they mentioned — city, job, travel schedule. If not mentioned: "Not mentioned yet".
+
+why_important: The deep reason WHY achieving this goal matters to them. The emotional reason underneath — their job, health, family, how they feel day to day, longevity, confidence. Quote or closely paraphrase what they actually said. If not mentioned: "Not mentioned yet".
+
+━━━━━━━━━━━━━━━━━━━━━━━━━
+PART 2 — PSYCHOLOGY READ
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+temperature: Pick ONE: "Cold" (no real interest), "Warming" (curious but guarded), "Hot" (engaged, opening up), "Ready to Close" (expressing desire or asking about next steps).
+
+temperature_score: A number 0-100. Cold = 0-25. Warming = 26-50. Hot = 51-80. Ready to Close = 81-100. Be precise, not round numbers.
+
+hidden_objection: The REAL psychological block. Never say "money" or "time" as standalone answers — those are surface excuses. Dig to the root. Fear of failure again, shame about starting point, past program that failed, distrust of online coaches, fear their partner will judge them. Name it specifically based on what they said.
+
+ghost_risk: Pick ONE: "Low", "Medium", "High", "Critical".
+
+ghost_risk_reason: The SPECIFIC signal in the conversation that explains this ghost risk level. Quote their words or reference the exact pattern. If energy dropped somewhere, say exactly where.
+
+next_message: The exact message the setter should send next. Follow this style — based on real conversations from this setter that led to bookings:
+- One question only. Never two.
+- Under 30 words usually. Never over 60.
+- Sound like a real person texting, not a sales script.
+- Mirror their vocabulary and energy exactly.
+- No fake enthusiasm openers — no "That's great!", "I totally understand", "Amazing!".
+- No emojis unless they used them. No exclamation marks unless they used them.
+- If a qualification point from Part 1 is missing — ask the most important missing question next.
+- If all 5 qualification points are covered — transition to booking: "If you're up for it I'd be happy to jump on a call sometime. I can understand your situation a lot better and see if I can help you"
+- If they shared something painful — acknowledge in one short sentence then ask the next question.
+
+power_insight: The one observation buried in the subtext that the setter completely missed. Something that reframes the entire approach to this person. Must be specific to THIS conversation. 2-3 sentences minimum. This should make the setter say "I never saw that."
+
+RULES:
+- Part 1 fields must only contain what was actually said. Never fabricate. "Not mentioned yet" is always better than a guess.
+- Every Part 2 field must reference something specific from the conversation.
+- next_message must sound like the setter — short, human, direct.
+- power_insight must be 2-3 sentences minimum.
+- If analyzing a screenshot, read every single message carefully before responding.
+
+Respond with ONLY valid JSON. No markdown. No explanation. No preamble. Exact structure:
+{
+  "goal": "<their exact goal or Not mentioned yet>",
+  "struggle": "<specific obstacle they described or Not mentioned yet>",
+  "how_long": "<duration they mentioned or Not mentioned yet>",
+  "location_and_work": "<all location and work details or Not mentioned yet>",
+  "why_important": "<their emotional reason or Not mentioned yet>",
+  "temperature": "Cold | Warming | Hot | Ready to Close",
+  "temperature_score": <0-100>,
+  "hidden_objection": "<deep psychological root cause>",
+  "ghost_risk": "Low | Medium | High | Critical",
+  "ghost_risk_reason": "<specific signal from conversation>",
+  "next_message": "<human, tone-matched, under 60 words>",
+  "power_insight": "<jaw-dropping buried observation, 2-3 sentences>"
+}`;
+
+  try {
+    let userContent;
+    if (currentTab === 'image') {
+      userContent = [
+        { type: 'image', source: { type: 'base64', media_type: uploadedImageType, data: uploadedImageBase64 } },
+        { type: 'text', text: 'This is a screenshot of a DM conversation. Read all messages carefully and analyze this conversation.' }
+      ];
+    } else {
+      userContent = `Analyze this DM conversation:\n\n${textInput}`;
+    }
+
+    const response = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1200,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userContent }]
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+      errorMsg.textContent = 'API error: ' + (data.error.message || JSON.stringify(data.error));
+      errorMsg.classList.add('visible');
+      return;
+    }
+
+    if (!data.content || !data.content.length) {
+      errorMsg.textContent = 'No response received. Check your API key in Railway environment variables.';
+      errorMsg.classList.add('visible');
+      return;
+    }
+
+    const text = data.content.map(i => i.text || '').join('');
+    const clean = text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+    displayResults(result);
+
+  } catch (err) {
+    errorMsg.textContent = 'Error: ' + err.message;
+    errorMsg.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    loading.classList.remove('active');
+  }
+}
+
+function displayResults(r) {
+  const tempColors = {
+    'Cold': '#42a5f5',
+    'Warming': '#f5a742',
+    'Hot': '#f57842',
+    'Ready to Close': '#c8f542'
+  };
+  const color = tempColors[r.temperature] || '#c8f542';
+
+  document.getElementById('temp-card').style.setProperty('--temp-color', color);
+  document.getElementById('temp-value').textContent = r.temperature;
+  document.getElementById('temp-value').style.color = color;
+
+  setTimeout(() => {
+    const bar = document.getElementById('temp-bar');
+    bar.style.background = color;
+    bar.style.width = r.temperature_score + '%';
+  }, 100);
+
+  const fields = {
+    'q-goal': r.goal,
+    'q-struggle': r.struggle,
+    'q-how-long': r.how_long,
+    'q-location': r.location_and_work,
+    'q-why': r.why_important
+  };
+
+  for (const [id, val] of Object.entries(fields)) {
+    const el = document.getElementById(id);
+    const isEmpty = !val || val === 'Not mentioned yet';
+    el.textContent = isEmpty ? 'Not mentioned yet' : val;
+    el.className = 'qual-val' + (isEmpty ? ' empty' : '') + (id === 'q-why' && !isEmpty ? ' highlight' : '');
+  }
+
+  document.getElementById('hidden-objection').textContent = r.hidden_objection || '—';
+
+  const ghostEl = document.getElementById('ghost-risk');
+  const ghostColors = { 'Low': '#c8f542', 'Medium': '#f5a742', 'High': '#f57842', 'Critical': '#f54242' };
+  ghostEl.textContent = (r.ghost_risk || '—') + (r.ghost_risk ? ' ghost risk' : '');
+  ghostEl.style.color = ghostColors[r.ghost_risk] || '#f54242';
+
+  document.getElementById('next-message').textContent = r.next_message || '—';
+  document.getElementById('ghost-risk-reason').textContent = r.ghost_risk_reason || '—';
+  document.getElementById('power-insight').textContent = r.power_insight || '—';
+
+  const results = document.getElementById('results');
+  results.classList.add('visible');
+  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function copyMessage() {
+  const msg = document.getElementById('next-message').textContent;
+  navigator.clipboard.writeText(msg).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied ✓';
+    setTimeout(() => btn.textContent = 'Copy message', 2000);
+  });
+}
+</script>
+</body>
+</html>
