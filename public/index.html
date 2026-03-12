@@ -685,13 +685,21 @@ Respond with ONLY valid JSON. No markdown. No explanation. No preamble. Exact st
     });
 
     const data = await response.json();
+
+    // Show real API error if present
+    if (data.error) {
+      errorMsg.textContent = 'API error: ' + (data.error.message || JSON.stringify(data.error));
+      errorMsg.classList.add('visible');
+      return;
+    }
+
     const text = data.content.map(i => i.text || '').join('');
     const clean = text.replace(/```json|```/g, '').trim();
     const result = JSON.parse(clean);
     displayResults(result);
 
   } catch (err) {
-    errorMsg.textContent = 'Something went wrong. Check your connection and try again.';
+    errorMsg.textContent = 'Error: ' + err.message;
     errorMsg.classList.add('visible');
   } finally {
     btn.disabled = false;
